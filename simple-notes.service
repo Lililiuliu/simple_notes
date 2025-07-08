@@ -1,0 +1,28 @@
+[Unit]
+Description=Simple Notes - 局域网共享服务
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cpi
+Group=cpi
+WorkingDirectory=/home/cpi/Desktop/simple_notes/simple_notes
+Environment=PATH=/home/cpi/Desktop/simple_notes/simple_notes/.venv/bin
+ExecStart=/home/cpi/Desktop/simple_notes/simple_notes/.venv/bin/streamlit run app.py --server.port=8501 --server.address=0.0.0.0 --server.headless=true
+Restart=always
+RestartSec=10
+
+# 输出日志
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=simple-notes
+
+# 安全设置
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/cpi/Desktop/simple_notes/simple_notes
+
+[Install]
+WantedBy=multi-user.target

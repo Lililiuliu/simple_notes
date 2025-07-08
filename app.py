@@ -37,7 +37,6 @@ def init_database():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS shared_texts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            device_name TEXT NOT NULL,
             title TEXT NOT NULL,
             content TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -48,7 +47,6 @@ def init_database():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS shared_files (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            device_name TEXT NOT NULL,
             filename TEXT NOT NULL,
             original_name TEXT NOT NULL,
             file_size INTEGER NOT NULL,
@@ -63,40 +61,20 @@ def ensure_files_dir():
     """确保文件存储目录存在"""
     Path(FILES_DIR).mkdir(exist_ok=True)
 
-def get_device_name():
-    """自动获取设备名称"""
-    try:
-        # 获取计算机名
-        hostname = socket.gethostname()
-        # 获取操作系统信息
-        system = platform.system()
-        
-        # 简化设备名显示
-        if system == "Darwin":
-            return f"{hostname} (Mac)"
-        elif system == "Windows":
-            return f"{hostname} (Win)"
-        elif system == "Linux":
-            return f"{hostname} (Linux)"
-        else:
-            return hostname
-    except:
-        return "未知设备"
-
-def save_text(device_name, content):
+def save_text(content):
     """保存文本分享"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     # 使用内容的前30个字符作为标题
     title = content[:30] + ("..." if len(content) > 30 else "")
     cursor.execute(
-        "INSERT INTO shared_texts (device_name, title, content) VALUES (?, ?, ?)",
-        (device_name, title, content)
+        "INSERT INTO shared_texts (title, content) VALUES (?, ?)",
+        (title, content)
     )
     conn.commit()
     conn.close()
 
-def save_file(device_name, uploaded_file):
+def save_file(uploaded_file):
     """保存文件分享"""
     # 生成唯一文件名
     timestamp = str(int(time.time()))
@@ -111,8 +89,8 @@ def save_file(device_name, uploaded_file):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO shared_files (device_name, filename, original_name, file_size) VALUES (?, ?, ?, ?)",
-        (device_name, filename, uploaded_file.name, uploaded_file.size)
+        "INSERT INTO shared_files (filename, original_name, file_size) VALUES (?, ?, ?)",
+        (filename, uploaded_file.name, uploaded_file.size)
     )
     conn.commit()
     conn.close()
@@ -197,17 +175,14 @@ ensure_files_dir()
 # 主界面
 st.title("📂 局域网共享")
 
-# 顶部信息栏 - 设备名和统计
-current_device = get_device_name()
+# 顶部信息栏 - 统计信息
 texts = get_shared_texts()
 files = get_shared_files()
 
-col1, col2, col3 = st.columns([2, 1, 1])
+col1, col2 = st.columns(2)
 with col1:
-    st.info(f"📱 {current_device}")
-with col2:
     st.metric("📝 文本", len(texts))
-with col3:
+with col2:
     st.metric("📁 文件", len(files))
 
 st.divider()
@@ -222,7 +197,7 @@ with upload_col1:
         
         if st.form_submit_button("🚀 分享文本", use_container_width=True):
             if content.strip():
-                save_text(current_device, content.strip())
+                save_text(content.strip())
                 st.success("✅ 文本分享成功！")
                 st.rerun()
             else:
@@ -246,7 +221,7 @@ with upload_col2:
                     continue
                 
                 try:
-                    save_file(current_device, uploaded_file)
+                    save_file(uploaded_file)
                     success_count += 1
                 except Exception as e:
                     st.error(f"❌ {uploaded_file.name} 上传失败")
@@ -270,7 +245,7 @@ with display_col1:
         search_text = st.text_input("🔍 搜索文本", placeholder="输入关键词...")
         
         for text in texts:
-            text_id, device_name, title, content, created_at = text
+            text_id, title, content, created_at = text
             
             # 搜索过滤
             if search_text and search_text.lower() not in content.lower():
@@ -292,8 +267,8 @@ with display_col1:
                         delete_text(text_id)
                         st.rerun()
                 
-                # 设备和时间信息
-                st.caption(f"📱 {device_name} · ⏰ {created_at}")
+                # 时间信息
+                st.caption(f"⏰ {created_at}")
                 
                 st.divider()
 
@@ -307,7 +282,7 @@ with display_col2:
         search_file = st.text_input("🔍 搜索文件", placeholder="输入文件名...")
         
         for file in files:
-            file_id, device_name, filename, original_name, file_size, created_at = file
+            file_id, filename, original_name, file_size, created_at = file
             
             # 搜索过滤
             if search_file and search_file.lower() not in original_name.lower():
@@ -323,8 +298,8 @@ with display_col2:
                         delete_file(file_id)
                         st.rerun()
                 
-                # 设备和时间信息
-                st.caption(f"📱 {device_name} · ⏰ {created_at}")
+                # 时间信息
+                st.caption(f"⏰ {created_at}")
                 
                 # 文件大小和下载
                 size_col, download_col = st.columns([1, 1])
